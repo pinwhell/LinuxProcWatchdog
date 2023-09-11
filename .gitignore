@@ -1,0 +1,12 @@
+
+src/obj/local/arm64-v8a/objs/memw/main.o
+src/obj/local/arm64-v8a/objs/memw/main.o.d
+*.o
+*.d
+src/obj/local/armeabi-v7a/memw
+src/obj/local/arm64-v8a/memw
+src/libs/armeabi-v7a/memw
+src/libs/arm64-v8a/memw
+.vscode/settings.json
+libs/armeabi-v7a/memw
+obj/local/armeabi-v7a/memw
