@@ -5,10 +5,12 @@
 #include "LinuxProcess/ElfUtils.h"
 #include <unordered_map>
 #include <functional>
+#include <unordered_set>
 
 struct LibInfoCache {
     uintptr_t mDotTextOffset;
     size_t mDotTextSize;
+    uint32_t mDotTextCrc;
 };
 
 std::unordered_map< std::string, LibInfoCache > libInfoCaches;
@@ -35,6 +37,7 @@ bool ElfLibRegisterCache(LinuxProcess* pProcess, const std::string& libName)
 
         libInfoCaches[libName].mDotTextOffset = pDotTextSection->sh_offset;
         libInfoCaches[libName].mDotTextSize = pDotTextSection->sh_size;
+        libInfoCaches[libName].mDotTextCrc = calculate_crc32((const void*)(libMap.base + pDotTextSection->sh_offset), pDotTextSection->sh_size);
     });
 
     if(libMappedProperly == false)
@@ -43,13 +46,16 @@ bool ElfLibRegisterCache(LinuxProcess* pProcess, const std::string& libName)
     return libInfoCaches.find(libName) != libInfoCaches.end();
 }
 
-uint32_t ElfDotTextSectionHash(LinuxProcess* pProcess, uint64_t libEntry, const std::string& libName)
+uint32_t ElfDotTextSectionHash(LinuxProcess* pProcess, uint64_t libEntry, const std::string& libName, uint32_t* originalDotTextHash = nullptr)
 {     
     if(
         libInfoCaches.find(libName) == libInfoCaches.end() &&
         ElfLibRegisterCache(pProcess, libName) == false
     )
         return 0x0;
+
+    if(originalDotTextHash)
+        *originalDotTextHash = libInfoCaches[libName].mDotTextCrc;
 
 
     // At this point, we alredy got a lib cache
@@ -103,7 +109,9 @@ int ProcInstrussionWatcherRun(
 
             // Good Lib Found
 
-            uint32_t libCodeSectionHash = ElfDotTextSectionHash(pTargetProcess, currLibEntry, libName);
+            uint32_t outOrigDotTextHash = 0x0;
+
+            uint32_t libCodeSectionHash = ElfDotTextSectionHash(pTargetProcess, currLibEntry, libName, &outOrigDotTextHash);
             
             if(libCodeSectionHash == 0x0)
                 continue;
@@ -113,10 +121,9 @@ int ProcInstrussionWatcherRun(
             if(dotCodeSectionHashs.find(libName) == dotCodeSectionHashs.end())
             {
                 // Looks like its the first time obtaining a hash for this lib
-                // lets simply update it
+                // lets simply put the original hash
 
-                dotCodeSectionHashs[libName] = libCodeSectionHash;
-                continue;
+                dotCodeSectionHashs[libName] = outOrigDotTextHash;
             }
 
             // Seems we alredy got a hash for the .text section of the lib
@@ -136,6 +143,17 @@ int ProcInstrussionWatcherRun(
     }
 
     return 0;
+}
+
+void PrintJsonResult(const std::string& libName, uint32_t oldCrc, uint32_t newCrc)
+{
+    std::cout << "{\n";
+    std::cout << "  \"DetectedChange\": {\n";
+    std::cout << "    \"LibraryName\": \"" << libName << "\",\n";
+    std::cout << "    \"OldCRC\": " << std::dec << oldCrc << ",\n";
+    std::cout << "    \"NewCRC\": " << std::dec << newCrc << "\n";
+    std::cout << "  }\n";
+    std::cout << "}\n";
 }
 
 int main(int argc, char** argv)
@@ -170,6 +188,6 @@ int main(int argc, char** argv)
     }
 
     return ProcInstrussionWatcherRun(targetProc.get(), libs, [](const std::string& libName, uint32_t prevCrc, uint32_t newCrc){
-        printf("Detected Change at: %s\nOld CRC=%08X New CRC=%08X\n\n", libName.c_str(), prevCrc, newCrc);
+        PrintJsonResult(libName.c_str(), prevCrc, newCrc);
     });
 }
