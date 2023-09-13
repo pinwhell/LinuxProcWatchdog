@@ -1,6 +1,7 @@
 # LinuxProcWatchdog
 
-![Screenshot 2023-09-11 at 15-59-06 OnPaste - Online Screenshot and Drawing Tool](https://github.com/pinwhell/LinuxProcWatchdog/assets/60289470/71355bc0-0e8a-4bf9-b24e-10b816d86b9a)
+![image](https://github.com/pinwhell/LinuxProcWatchdog/assets/60289470/19686427-cca6-413c-8a70-dc2ab0ed8d73)
+
 
 
 LinuxProcWatchdog is a powerful process and memory monitoring tool designed for Linux environments. It provides effortless real-time tracking of modifications, focusing on shared libraries.
@@ -17,4 +18,4 @@ LinuxProcWatchdog is your vigilant sentinel in the Linux memory realm. It offers
 
 ### Syntax
 ```shell
-memw --target-name [name of the process to watch here] --libs [list of libraries to monitor, e.g., lib1.so, lib2.so]
+memw --target-name [name of the process to watch here] --libs [list of libraries to monitor, e.g., lib1.so, lib2.so --interval [interval in millis at which checks will run]]
