@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <functional>
 #include <unordered_set>
+#include <chrono>
+#include <thread>
 
 struct LibInfoCache {
     uintptr_t mDotTextOffset;
@@ -83,6 +85,7 @@ uint32_t ElfDotTextSectionHash(LinuxProcess* pProcess, uint64_t libEntry, const 
 int ProcInstrussionWatcherRun(
     LinuxProcess* pTargetProcess,
     const std::vector<std::string>& libs, 
+    uint32_t interval,
     std::function<void(
         const std::string& libName,
         uint32_t prevCrc,
@@ -140,6 +143,14 @@ int ProcInstrussionWatcherRun(
 
             dotCodeSectionHashs[libName] = libCodeSectionHash;
         }
+        
+        if(interval < 1)
+            continue;
+
+        // Seems we have a time to sleep
+        // Lets perform te sleeping
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(interval));
     }
 
     return 0;
@@ -154,6 +165,11 @@ void PrintJsonResult(const std::string& libName, uint32_t oldCrc, uint32_t newCr
     std::cout << "    \"NewCRC\": " << std::dec << newCrc << "\n";
     std::cout << "  }\n";
     std::cout << "}\n";
+
+    // Lets signal end of the JSON
+    // With Empty new line
+
+    std::cout << "\n"; 
 }
 
 int main(int argc, char** argv)
@@ -162,10 +178,12 @@ int main(int argc, char** argv)
 
     std::string targetName;
     std::vector<std::string> libs;
+    uint32_t interval = 500;
 
     auto cli = (
         clipp::option("--target-name") & clipp::value("process name to watch on", targetName).required(true),
-        clipp::option("--libs") & clipp::values("libs to watch on", libs).required(true)
+        clipp::option("--libs") & clipp::values("libs to watch on", libs).required(true),
+        clipp::option("--interval") & clipp::value("Interval in milliseconds at which rate to run the checks", interval)
         );
         
     auto results = clipp::parse(argc, argv, cli);
@@ -187,7 +205,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    return ProcInstrussionWatcherRun(targetProc.get(), libs, [](const std::string& libName, uint32_t prevCrc, uint32_t newCrc){
+    return ProcInstrussionWatcherRun(targetProc.get(), libs, interval, [](const std::string& libName, uint32_t prevCrc, uint32_t newCrc){
         PrintJsonResult(libName.c_str(), prevCrc, newCrc);
     });
 }
